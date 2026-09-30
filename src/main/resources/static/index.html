@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18342d">
+  <title>LojaCarro | Estoque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172622;
+      --muted: #667570;
+      --line: #dce5e1;
+      --paper: #ffffff;
+      --canvas: #f3f6f4;
+      --green: #18342d;
+      --green-soft: #e8f0ec;
+      --lime: #d7f36a;
+      --coral: #bd4937;
+      --danger-soft: #fff0ed;
+      --shadow: 0 22px 70px rgb(23 38 34 / 16%);
+      font-family: "DM Sans", "Aptos", sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 90% 5%, rgb(215 243 106 / 18%), transparent 27rem),
+        var(--canvas);
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .topbar {
+      min-height: 68px;
+      padding: 0 clamp(20px, 5vw, 76px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      color: white;
+      background: var(--green);
+    }
+
+    .brand, .topbar-meta, .api-state { display: flex; align-items: center; }
+    .brand { gap: 11px; font-weight: 700; }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      color: var(--green);
+      background: var(--lime);
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .topbar-meta { gap: 22px; color: #d4dfda; font-size: 12px; }
+    .api-state { gap: 8px; }
+    .api-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); }
+    .api-state.offline .api-dot { background: #ff907c; }
+
+    .workspace {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 42px 0 56px;
+      animation: arrive 420ms ease-out both;
+    }
+
+    .page-heading {
+      min-height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 32px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #6a796f;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+    }
+
+    h1, h2, p { margin-top: 0; }
+    h1, h2 { font-family: "Space Grotesk", "Aptos", sans-serif; }
+    h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 39px); line-height: 1.1; }
+    .subtitle { margin-bottom: 0; color: var(--muted); font-size: 14px; }
+
+    .heading-image {
+      width: 208px;
+      height: 112px;
+      flex: 0 0 auto;
+      overflow: hidden;
+      border-radius: 4px 22px 4px 22px;
+      background: #bac8c1;
+      object-fit: cover;
+      object-position: center 58%;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 38px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: rgb(255 255 255 / 50%);
+    }
+
+    .metric { min-height: 88px; padding: 17px 24px; border-right: 1px solid var(--line); }
+    .metric:last-child { border-right: 0; }
+    .metric-label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .metric-value { font-family: "Space Grotesk", sans-serif; font-size: 23px; font-weight: 600; }
+
+    .inventory-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 17px;
+    }
+
+    .inventory-title { display: flex; align-items: baseline; gap: 11px; }
+    h2 { margin-bottom: 0; font-size: 23px; }
+    .result-count { color: var(--muted); font-size: 12px; }
+    .controls { display: flex; align-items: center; gap: 10px; }
+
+    .search-wrap { position: relative; }
+    .search-icon {
+      position: absolute;
+      top: 50%;
+      left: 13px;
+      transform: translateY(-52%);
+      color: #75847e;
+      font-size: 18px;
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: min(260px, 34vw);
+      height: 42px;
+      padding: 0 12px 0 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      outline: none;
+      color: var(--ink);
+      background: var(--paper);
+    }
+
+    .search-input:focus, .field input:focus { border-color: #608d75; box-shadow: 0 0 0 3px rgb(96 141 117 / 16%); }
+    .button {
+      min-height: 42px;
+      padding: 0 15px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 700;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    .button:hover { transform: translateY(-1px); }
+    .button-primary { color: var(--green); background: var(--lime); }
+    .button-primary:hover { background: #c9e65a; }
+    .button-secondary { color: var(--ink); border-color: var(--line); background: white; }
+    .button-secondary:hover { background: #f7faf8; }
+    .button-danger { color: var(--coral); border-color: #f0d5cf; background: var(--danger-soft); }
+
+    .table-shell { overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    thead { color: #718078; background: #f7f9f8; }
+    th { height: 43px; padding: 0 20px; font-size: 10px; font-weight: 700; }
+    td { height: 66px; padding: 10px 20px; border-top: 1px solid #edf1ef; font-size: 13px; }
+    tbody tr { transition: background 120ms ease; }
+    tbody tr:hover { background: #fbfcfb; }
+    .car-model { display: block; font-weight: 700; }
+    .car-id { display: block; margin-top: 3px; color: #89948f; font-size: 10px; }
+    .price { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .row-actions { display: flex; justify-content: flex-end; gap: 7px; }
+    .icon-button {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: #54645d;
+      background: transparent;
+      font-size: 16px;
+    }
+    .icon-button:hover { border-color: var(--line); background: white; }
+    .icon-button.delete:hover { color: var(--coral); background: var(--danger-soft); }
+    .empty-cell { height: 180px; text-align: center; color: var(--muted); }
+    .empty-mark {
+      width: 42px;
+      height: 42px;
+      margin: 0 auto 10px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--green);
+      background: var(--green-soft);
+      font-size: 20px;
+    }
+    .empty-cell strong { display: block; margin-bottom: 4px; color: var(--ink); }
+    .notice { min-height: 23px; margin: 11px 2px 0; color: var(--muted); font-size: 12px; }
+    .notice.error { color: var(--coral); }
+
+    dialog {
+      width: min(440px, calc(100% - 28px));
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--ink);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    dialog::backdrop { background: rgb(17 32 27 / 52%); backdrop-filter: blur(2px); }
+    .dialog-head { padding: 22px 24px 16px; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { margin-bottom: 5px; font-size: 21px; }
+    .dialog-head p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+    .car-form { padding: 20px 24px 22px; }
+    .field { display: grid; gap: 7px; margin-bottom: 15px; }
+    .field label { font-size: 12px; font-weight: 700; }
+    .field input {
+      height: 42px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      outline: none;
+      background: white;
+    }
+    .field-hint { margin-top: -2px; color: var(--muted); font-size: 11px; }
+    .form-error { min-height: 18px; margin: -2px 0 12px; color: var(--coral); font-size: 12px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 5px; }
+
+    @keyframes arrive { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 700px) {
+      .topbar { min-height: 60px; padding-inline: 18px; }
+      .topbar-meta { gap: 0; }
+      .topbar-meta > span:last-child { display: none; }
+      .workspace { width: min(100% - 28px, 560px); padding-top: 25px; }
+      .page-heading { min-height: 120px; gap: 16px; margin-bottom: 23px; }
+      .heading-image { width: 112px; height: 86px; border-radius: 4px 15px 4px 15px; }
+      .subtitle { max-width: 34ch; font-size: 12px; line-height: 1.5; }
+      .metrics { margin-bottom: 28px; }
+      .metric { min-height: 76px; padding: 14px 11px; }
+      .metric-label { font-size: 9px; }
+      .metric-value { font-size: 18px; }
+      .inventory-head { align-items: flex-start; flex-direction: column; }
+      .controls { width: 100%; }
+      .search-wrap { flex: 1; }
+      .search-input { width: 100%; }
+      .button { padding-inline: 11px; }
+      th { padding-inline: 11px; }
+      td { padding: 10px 11px; }
+    }
+
+    @media (max-width: 480px) {
+      .heading-image { width: 84px; height: 75px; }
+      h1 { font-size: 27px; }
+      .inventory-title { gap: 8px; }
+      h2 { font-size: 21px; }
+      .table-shell { border-radius: 7px; }
+      table, tbody, tr, td { display: block; width: 100%; }
+      thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+      tbody tr { padding: 7px 13px; border-top: 1px solid #edf1ef; }
+      td { height: auto; min-height: 34px; padding: 7px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; }
+      td:first-child { display: block; padding-top: 8px; }
+      td:last-child { justify-content: flex-end; padding-top: 0; }
+      td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 10px; font-weight: 600; }
+      .empty-cell { height: 180px; padding: 25px 10px; display: table-cell; }
+      .empty-cell::before { content: none !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">LC</span><span>LojaCarro</span></div>
+    <div class="topbar-meta">
+      <span class="api-state" id="api-state"><span class="api-dot" aria-hidden="true"></span><span id="api-label">Conectando à API</span></span>
+      <span>GESTÃO DE ESTOQUE</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="page-heading" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">INVENTÁRIO / VEÍCULOS</p>
+        <h1 id="page-title">Estoque de veículos</h1>
+        <p class="subtitle">Acompanhe modelos, anos e valores em um só lugar.</p>
+      </div>
+      <img class="heading-image" src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=520&q=80" alt="Carro esportivo em exposição" loading="lazy">
+    </section>
+
+    <section class="metrics" aria-label="Resumo do estoque">
+      <div class="metric"><span class="metric-label">VEÍCULOS NO ESTOQUE</span><strong class="metric-value" id="total-count">—</strong></div>
+      <div class="metric"><span class="metric-label">ANO MAIS RECENTE</span><strong class="metric-value" id="latest-year">—</strong></div>
+      <div class="metric"><span class="metric-label">VALOR MÉDIO</span><strong class="metric-value" id="average-price">—</strong></div>
+    </section>
+
+    <section aria-labelledby="inventory-title">
+      <div class="inventory-head">
+        <div class="inventory-title">
+          <h2 id="inventory-title">Veículos</h2>
+          <span class="result-count" id="result-count"></span>
+        </div>
+        <div class="controls">
+          <label class="search-wrap">
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <input class="search-input" id="search" type="search" placeholder="Buscar modelo ou ano" aria-label="Buscar modelo ou ano">
+          </label>
+          <button class="button button-primary" id="add-car" type="button"><span aria-hidden="true">+</span> Novo carro</button>
+        </div>
+      </div>
+
+      <div class="table-shell">
+        <table>
+          <thead><tr><th scope="col">MODELO</th><th scope="col">ANO</th><th scope="col">PREÇO</th><th scope="col" aria-label="Ações"></th></tr></thead>
+          <tbody id="car-list"></tbody>
+        </table>
+      </div>
+      <p class="notice" id="notice" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <dialog id="car-dialog" aria-labelledby="dialog-title">
+    <div class="dialog-head">
+      <h2 id="dialog-title">Novo veículo</h2>
+      <p>Preencha os dados para atualizar o estoque.</p>
+    </div>
+    <form class="car-form" id="car-form">
+      <input id="car-id" type="hidden">
+      <div class="field">
+        <label for="modelo">Modelo</label>
+        <input id="modelo" name="modelo" type="text" maxlength="4" autocomplete="off" required>
+        <span class="field-hint">Use até 4 caracteres.</span>
+      </div>
+      <div class="field">
+        <label for="ano">Ano</label>
+        <input id="ano" name="ano" type="number" min="1886" max="2100" step="1" required>
+      </div>
+      <div class="field">
+        <label for="preco">Preço (R$)</label>
+        <input id="preco" name="preco" type="number" min="0" step="0.01" required>
+      </div>
+      <p class="form-error" id="form-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button class="button button-secondary" id="cancel-dialog" type="button">Cancelar</button>
+        <button class="button button-primary" id="save-car" type="submit">Salvar veículo</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const carList = document.querySelector("#car-list");
+    const notice = document.querySelector("#notice");
+    const dialog = document.querySelector("#car-dialog");
+    const form = document.querySelector("#car-form");
+    const search = document.querySelector("#search");
+    const apiState = document.querySelector("#api-state");
+    const apiLabel = document.querySelector("#api-label");
+    const formError = document.querySelector("#form-error");
+    let cars = [];
+
+    const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+    async function request(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers }
+      });
+      if (!response.ok) {
+        let message = `Erro ${response.status} ao acessar a API.`;
+        try {
+          const body = await response.json();
+          message = body.erro || message;
+        } catch { }
+        throw new Error(message);
+      }
+      if (response.status === 204) return null;
+      return response.json();
+    }
+
+    function setNotice(message, isError = false) {
+      notice.textContent = message;
+      notice.classList.toggle("error", isError);
+    }
+
+    function updateMetrics() {
+      document.querySelector("#total-count").textContent = cars.length;
+      document.querySelector("#latest-year").textContent = cars.length ? Math.max(...cars.map(car => Number(car.ano) || 0)) : "—";
+      const average = cars.length ? cars.reduce((total, car) => total + (Number(car.preco) || 0), 0) / cars.length : 0;
+      document.querySelector("#average-price").textContent = cars.length ? money.format(average) : "—";
+    }
+
+    function renderCars() {
+      const query = search.value.trim().toLocaleLowerCase("pt-BR");
+      const visibleCars = cars.filter(car => `${car.modelo} ${car.ano}`.toLocaleLowerCase("pt-BR").includes(query));
+      document.querySelector("#result-count").textContent = `${visibleCars.length} ${visibleCars.length === 1 ? "resultado" : "resultados"}`;
+
+      if (!visibleCars.length) {
+        const title = cars.length ? "Nenhum resultado encontrado" : "Seu estoque está vazio";
+        const detail = cars.length ? "Tente outro modelo ou ano." : "Cadastre o primeiro veículo para começar.";
+        carList.innerHTML = `<tr><td class="empty-cell" colspan="4"><span class="empty-mark" aria-hidden="true">⌕</span><strong>${title}</strong>${detail}</td></tr>`;
+        updateMetrics();
+        return;
+      }
+
+      carList.replaceChildren(...visibleCars.map(car => {
+        const row = document.createElement("tr");
+        const modelCell = document.createElement("td");
+        modelCell.innerHTML = `<span class="car-model"></span><span class="car-id"></span>`;
+        modelCell.querySelector(".car-model").textContent = car.modelo ?? "Sem modelo";
+        modelCell.querySelector(".car-id").textContent = `ID ${car.id}`;
+
+        const yearCell = document.createElement("td");
+        yearCell.dataset.label = "Ano";
+        yearCell.textContent = car.ano;
+
+        const priceCell = document.createElement("td");
+        priceCell.dataset.label = "Preço";
+        priceCell.className = "price";
+        priceCell.textContent = money.format(Number(car.preco) || 0);
+
+        const actionsCell = document.createElement("td");
+        actionsCell.dataset.label = "Ações";
+        const actions = document.createElement("div");
+        actions.className = "row-actions";
+        const editButton = document.createElement("button");
+        editButton.className = "icon-button";
+        editButton.type = "button";
+        editButton.setAttribute("aria-label", `Editar ${car.modelo}`);
+        editButton.title = "Editar veículo";
+        editButton.textContent = "✎";
+        editButton.addEventListener("click", () => openEditDialog(car));
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "icon-button delete";
+        deleteButton.type = "button";
+        deleteButton.setAttribute("aria-label", `Excluir ${car.modelo}`);
+        deleteButton.title = "Excluir veículo";
+        deleteButton.textContent = "×";
+        deleteButton.addEventListener("click", () => deleteCar(car));
+        actions.append(editButton, deleteButton);
+        actionsCell.append(actions);
+        row.append(modelCell, yearCell, priceCell, actionsCell);
+        return row;
+      }));
+      updateMetrics();
+    }
+
+    async function loadCars() {
+      try {
+        cars = await request("/carro/listarCarros");
+        apiState.classList.remove("offline");
+        apiLabel.textContent = "API conectada";
+        setNotice("Estoque atualizado.");
+        renderCars();
+      } catch (error) {
+        apiState.classList.add("offline");
+        apiLabel.textContent = "API indisponível";
+        setNotice(error.message, true);
+        carList.innerHTML = `<tr><td class="empty-cell" colspan="4"><span class="empty-mark" aria-hidden="true">!</span><strong>Não foi possível carregar o estoque</strong>Verifique a conexão com a API e tente novamente.</td></tr>`;
+        updateMetrics();
+      }
+    }
+
+    function openNewDialog() {
+      form.reset();
+      document.querySelector("#car-id").value = "";
+      document.querySelector("#dialog-title").textContent = "Novo veículo";
+      document.querySelector("#save-car").textContent = "Salvar veículo";
+      formError.textContent = "";
+      dialog.showModal();
+      document.querySelector("#modelo").focus();
+    }
+
+    function openEditDialog(car) {
+      document.querySelector("#car-id").value = car.id;
+      document.querySelector("#modelo").value = car.modelo;
+      document.querySelector("#ano").value = car.ano;
+      document.querySelector("#preco").value = car.preco;
+      document.querySelector("#dialog-title").textContent = "Editar veículo";
+      document.querySelector("#save-car").textContent = "Salvar alterações";
+      formError.textContent = "";
+      dialog.showModal();
+      document.querySelector("#modelo").focus();
+    }
+
+    async function saveCar(event) {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const id = document.querySelector("#car-id").value;
+      const payload = {
+        modelo: document.querySelector("#modelo").value.trim(),
+        ano: Number(document.querySelector("#ano").value),
+        preco: Number(document.querySelector("#preco").value)
+      };
+      const saveButton = document.querySelector("#save-car");
+      saveButton.disabled = true;
+      formError.textContent = "";
+      try {
+        if (id) {
+          payload.id = Number(id);
+          await request(`/carro/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        } else {
+          await request("/carro/salvar", { method: "POST", body: JSON.stringify(payload) });
+        }
+        dialog.close();
+        setNotice(id ? "Veículo atualizado." : "Veículo cadastrado.");
+        await loadCars();
+      } catch (error) {
+        formError.textContent = error.message;
+      } finally {
+        saveButton.disabled = false;
+      }
+    }
+
+    async function deleteCar(car) {
+      if (!window.confirm(`Excluir ${car.modelo} do estoque?`)) return;
+      try {
+        await request(`/carro/${car.id}`, { method: "DELETE" });
+        setNotice("Veículo excluído.");
+        await loadCars();
+      } catch (error) {
+        setNotice(error.message, true);
+      }
+    }
+
+    document.querySelector("#add-car").addEventListener("click", openNewDialog);
+    document.querySelector("#cancel-dialog").addEventListener("click", () => dialog.close());
+    form.addEventListener("submit", saveCar);
+    search.addEventListener("input", renderCars);
+    dialog.addEventListener("click", event => {
+      if (event.target === dialog) dialog.close();
+    });
+
+    loadCars();
+  </script>
+</body>
+</html>
