@@ -10,6 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/usuarios")
+@CrossOrigin(origins = "${FRONTEND_URL:http://localhost:8080}")
 public class UsuarioController {
 
     private final UsuarioService service;

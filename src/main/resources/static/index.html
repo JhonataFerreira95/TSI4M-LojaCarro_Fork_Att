@@ -297,6 +297,31 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
     }
+
+    .operator-bar, .management-panel { margin-bottom: 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .operator-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .operator-bar label, .user-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .operator-bar select, .user-form input { min-height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font: inherit; }
+    .operator-bar select { width: min(330px, 60%); }
+    .management-panel h2 { margin: 0 0 14px; }
+    .user-form { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 16px; }
+    .user-form label { flex: 1; max-width: 460px; }
+    .management-table { width: 100%; border-collapse: collapse; }
+    .management-table th, .management-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+    .management-table th { color: var(--muted); font-size: 10px; letter-spacing: .08em; }
+    .management-table td { font-size: 12px; }
+    .management-table button { margin-left: 6px; border: 0; background: transparent; color: var(--blue); cursor: pointer; font: inherit; }
+    .management-table button.danger { color: #c75050; }
+    .management-empty { padding: 14px; color: var(--muted); font-size: 12px; }
+    .log-operation { color: var(--muted); }
+    .hidden { display: none !important; }
+
+    @media (max-width: 600px) {
+      .operator-bar { align-items: stretch; flex-direction: column; }
+      .operator-bar select { width: 100%; }
+      .user-form { align-items: stretch; flex-direction: column; }
+      .user-form label { max-width: none; }
+    }
   </style>
 </head>
 <body>
@@ -324,6 +349,15 @@
       <div class="metric"><span class="metric-label">VALOR MÉDIO</span><strong class="metric-value" id="average-price">—</strong></div>
     </section>
 
+    <section class="operator-bar" aria-label="Usuário responsável">
+      <label for="operator-select">Operador das ações de veículos
+        <select id="operator-select" required>
+          <option value="">Carregando usuários...</option>
+        </select>
+      </label>
+      <span class="subtitle">As ações no estoque são registradas com este usuário.</span>
+    </section>
+
     <section aria-labelledby="inventory-title">
       <div class="inventory-head">
         <div class="inventory-title">
@@ -346,6 +380,31 @@
         </table>
       </div>
       <p class="notice" id="notice" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="management-panel" aria-labelledby="users-title">
+      <h2 id="users-title">Usuários</h2>
+      <form class="user-form" id="user-form">
+        <input id="user-id" type="hidden">
+        <label for="user-name">Nome
+          <input id="user-name" name="nome" maxlength="120" autocomplete="name" placeholder="Nome do usuário" required>
+        </label>
+        <button class="button button-primary" id="save-user" type="submit">Adicionar usuário</button>
+        <button class="button button-secondary hidden" id="cancel-user-edit" type="button">Cancelar</button>
+      </form>
+      <p class="form-error" id="user-error" role="alert"></p>
+      <table class="management-table">
+        <thead><tr><th>NOME</th><th>ID</th><th scope="col" aria-label="Ações"></th></tr></thead>
+        <tbody id="user-list"></tbody>
+      </table>
+    </section>
+
+    <section class="management-panel" aria-labelledby="logs-title">
+      <h2 id="logs-title">Últimas operações</h2>
+      <table class="management-table">
+        <thead><tr><th>USUÁRIO</th><th>OPERAÇÃO</th><th>CARRO</th><th>DATA E HORA</th></tr></thead>
+        <tbody id="log-list"></tbody>
+      </table>
     </section>
   </main>
 
@@ -386,7 +445,14 @@
     const apiState = document.querySelector("#api-state");
     const apiLabel = document.querySelector("#api-label");
     const formError = document.querySelector("#form-error");
+    const operatorSelect = document.querySelector("#operator-select");
+    const userList = document.querySelector("#user-list");
+    const userForm = document.querySelector("#user-form");
+    const userError = document.querySelector("#user-error");
+    const logList = document.querySelector("#log-list");
+    const usersApi = "http://localhost:8081/usuarios";
     let cars = [];
+    let users = [];
 
     const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -399,12 +465,110 @@
         let message = `Erro ${response.status} ao acessar a API.`;
         try {
           const body = await response.json();
-          message = body.erro || message;
+          message = body.erro || body.detail || message;
         } catch { }
         throw new Error(message);
       }
       if (response.status === 204) return null;
       return response.json();
+    }
+
+    function userHeaders() {
+      if (!operatorSelect.value) throw new Error("Cadastre e selecione um usuário antes de operar o estoque.");
+      return { "X-User-Id": operatorSelect.value };
+    }
+
+    function renderUsers() {
+      const selectedId = operatorSelect.value;
+      operatorSelect.replaceChildren(new Option("Selecione um usuário", ""));
+      users.forEach(user => operatorSelect.add(new Option(`${user.nome} (ID ${user.id})`, user.id)));
+      if (users.some(user => String(user.id) === selectedId)) operatorSelect.value = selectedId;
+      if (!operatorSelect.value && users.length) operatorSelect.value = String(users[0].id);
+
+      userList.replaceChildren(...users.map(user => {
+        const row = document.createElement("tr");
+        const nameCell = document.createElement("td");
+        nameCell.textContent = user.nome;
+        const idCell = document.createElement("td");
+        idCell.textContent = user.id;
+        const actionsCell = document.createElement("td");
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.textContent = "Editar";
+        edit.addEventListener("click", () => {
+          document.querySelector("#user-id").value = user.id;
+          document.querySelector("#user-name").value = user.nome;
+          document.querySelector("#save-user").textContent = "Salvar alterações";
+          document.querySelector("#cancel-user-edit").classList.remove("hidden");
+          document.querySelector("#user-name").focus();
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "danger";
+        remove.textContent = "Excluir";
+        remove.addEventListener("click", () => deleteUser(user));
+        actionsCell.append(edit, remove);
+        row.append(nameCell, idCell, actionsCell);
+        return row;
+      }));
+    }
+
+    async function loadUsers() {
+      try {
+        users = await request(usersApi);
+        renderUsers();
+        await Promise.all([loadCars(), loadLogs()]);
+      } catch (error) {
+        apiState.classList.add("offline");
+        apiLabel.textContent = "API de usuários indisponível";
+        setNotice(error.message, true);
+        userList.replaceChildren();
+      }
+    }
+
+    async function loadLogs() {
+      try {
+        const logs = await request("/logs");
+        logList.replaceChildren(...logs.slice(-20).reverse().map(log => {
+          const row = document.createElement("tr");
+          const values = [
+            `${log.usuarioNome} · #${log.usuarioId}`,
+            log.operacao.replaceAll("_", " "),
+            log.carroId == null ? "—" : `#${log.carroId}`,
+            new Date(log.dataHora).toLocaleString("pt-BR")
+          ];
+          values.forEach((value, index) => {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            if (index === 1) cell.className = "log-operation";
+            row.append(cell);
+          });
+          return row;
+        }));
+      } catch (error) {
+        logList.replaceChildren();
+        setNotice(`Não foi possível carregar os logs: ${error.message}`, true);
+      }
+    }
+
+    function resetUserForm() {
+      userForm.reset();
+      document.querySelector("#user-id").value = "";
+      document.querySelector("#save-user").textContent = "Adicionar usuário";
+      document.querySelector("#cancel-user-edit").classList.add("hidden");
+      userError.textContent = "";
+    }
+
+    async function deleteUser(user) {
+      if (!window.confirm(`Excluir o usuário ${user.nome}?`)) return;
+      try {
+        await request(`${usersApi}/${user.id}`, { method: "DELETE" });
+        if (operatorSelect.value === String(user.id)) operatorSelect.value = "";
+        await loadUsers();
+        setNotice("Usuário excluído.");
+      } catch (error) {
+        setNotice(error.message, true);
+      }
     }
 
     function setNotice(message, isError = false) {
@@ -476,10 +640,12 @@
 
     async function loadCars() {
       try {
-        cars = await request("/carro/listarCarros");
+        cars = operatorSelect.value
+          ? await request("/carro/listarCarros", { headers: userHeaders() })
+          : [];
         apiState.classList.remove("offline");
-        apiLabel.textContent = "API conectada";
-        setNotice("Estoque atualizado.");
+        apiLabel.textContent = operatorSelect.value ? "APIs conectadas" : "Selecione um usuário";
+        if (operatorSelect.value) setNotice("Estoque atualizado.");
         renderCars();
       } catch (error) {
         apiState.classList.add("offline");
@@ -527,13 +693,13 @@
       try {
         if (id) {
           payload.id = Number(id);
-          await request(`/carro/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+          await request(`/carro/${id}`, { method: "PUT", body: JSON.stringify(payload), headers: userHeaders() });
         } else {
-          await request("/carro/salvar", { method: "POST", body: JSON.stringify(payload) });
+          await request("/carro/salvar", { method: "POST", body: JSON.stringify(payload), headers: userHeaders() });
         }
         dialog.close();
         setNotice(id ? "Veículo atualizado." : "Veículo cadastrado.");
-        await loadCars();
+        await Promise.all([loadCars(), loadLogs()]);
       } catch (error) {
         formError.textContent = error.message;
       } finally {
@@ -544,9 +710,9 @@
     async function deleteCar(car) {
       if (!window.confirm(`Excluir ${car.modelo} do estoque?`)) return;
       try {
-        await request(`/carro/${car.id}`, { method: "DELETE" });
+        await request(`/carro/${car.id}`, { method: "DELETE", headers: userHeaders() });
         setNotice("Veículo excluído.");
-        await loadCars();
+        await Promise.all([loadCars(), loadLogs()]);
       } catch (error) {
         setNotice(error.message, true);
       }
@@ -556,11 +722,29 @@
     document.querySelector("#cancel-dialog").addEventListener("click", () => dialog.close());
     form.addEventListener("submit", saveCar);
     search.addEventListener("input", renderCars);
+    operatorSelect.addEventListener("change", () => Promise.all([loadCars(), loadLogs()]));
+    document.querySelector("#cancel-user-edit").addEventListener("click", resetUserForm);
+    userForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const userId = document.querySelector("#user-id").value;
+      const payload = { nome: document.querySelector("#user-name").value.trim() };
+      try {
+        await request(userId ? `${usersApi}/${userId}` : usersApi, {
+          method: userId ? "PUT" : "POST",
+          body: JSON.stringify(payload)
+        });
+        resetUserForm();
+        await loadUsers();
+        setNotice(userId ? "Usuário atualizado." : "Usuário cadastrado.");
+      } catch (error) {
+        userError.textContent = error.message;
+      }
+    });
     dialog.addEventListener("click", event => {
       if (event.target === dialog) dialog.close();
     });
 
-    loadCars();
+    loadUsers();
   </script>
 </body>
 </html>

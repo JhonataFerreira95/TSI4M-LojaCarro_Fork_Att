@@ -2,7 +2,9 @@ package br.org.edu.ifrn.LojaCarro.controllers;
 
 import br.org.edu.ifrn.LojaCarro.CarroException;
 import br.org.edu.ifrn.LojaCarro.model.Carro;
+import br.org.edu.ifrn.LojaCarro.services.CarroAuditoriaService;
 import br.org.edu.ifrn.LojaCarro.services.CarroService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,15 +25,26 @@ class CarroControllerTest {
     @Mock
     private CarroService carroService;
 
+    @Mock
+    private CarroAuditoriaService auditoriaService;
+
     @InjectMocks
     private CarroController carroController;
+
+    @BeforeEach
+    void executarAcaoAuditoriaNosTestes() {
+        lenient().doAnswer(invocation -> {
+            java.util.function.Supplier<?> acao = invocation.getArgument(2);
+            return acao.get();
+        }).when(auditoriaService).executar(anyLong(), anyString(), any(), any());
+    }
 
     @Test
     void salvarCarroReturnsSavedCar() {
         Carro carro = new Carro("Civi", 2020);
         when(carroService.save(carro)).thenReturn(carro);
 
-        ResponseEntity<Carro> response = carroController.salvarCarro(carro);
+        ResponseEntity<Carro> response = carroController.salvarCarro(1L, carro);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(carro, response.getBody());
@@ -42,7 +55,7 @@ class CarroControllerTest {
         Carro carro = new Carro("Civi", 2020);
         when(carroService.update(carro)).thenReturn(carro);
 
-        ResponseEntity<Carro> response = carroController.atualizarCarro(8L, carro);
+        ResponseEntity<Carro> response = carroController.atualizarCarro(1L, 8L, carro);
 
         assertEquals(8L, carro.getId());
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -52,7 +65,7 @@ class CarroControllerTest {
 
     @Test
     void deletarCarroReturnsNoContent() {
-        ResponseEntity<Void> response = carroController.deletarCarro(8L);
+        ResponseEntity<Void> response = carroController.deletarCarro(1L, 8L);
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
         assertNull(response.getBody());
@@ -64,7 +77,7 @@ class CarroControllerTest {
         Carro carro = new Carro("Civi", 2020);
         when(carroService.findById(8L)).thenReturn(Optional.of(carro));
 
-        ResponseEntity<Carro> response = carroController.pesquisarCarroPorId(8L);
+        ResponseEntity<Carro> response = carroController.pesquisarCarroPorId(1L, 8L);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(carro, response.getBody());
@@ -74,7 +87,7 @@ class CarroControllerTest {
     void pesquisarCarroPorIdReturnsNotFoundWhenAbsent() {
         when(carroService.findById(8L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Carro> response = carroController.pesquisarCarroPorId(8L);
+        ResponseEntity<Carro> response = carroController.pesquisarCarroPorId(1L, 8L);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());
@@ -85,7 +98,7 @@ class CarroControllerTest {
         List<Carro> carros = List.of(new Carro("Civi", 2020));
         when(carroService.findAll()).thenReturn(carros);
 
-        ResponseEntity<List<Carro>> response = carroController.pesquisarTodosCarros();
+        ResponseEntity<List<Carro>> response = carroController.pesquisarTodosCarros(1L);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(carros, response.getBody());
@@ -96,7 +109,7 @@ class CarroControllerTest {
         Carro carro = new Carro("Civi", 2020);
         when(carroService.findByModelo("Civi")).thenReturn(Optional.of(carro));
 
-        ResponseEntity<Carro> response = carroController.pesquisarCarroPorModelo(" Civi ");
+        ResponseEntity<Carro> response = carroController.pesquisarCarroPorModelo(1L, " Civi ");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(carro, response.getBody());
@@ -107,7 +120,7 @@ class CarroControllerTest {
     void pesquisarCarroPorModeloReturnsNotFoundWhenAbsent() {
         when(carroService.findByModelo("Civi")).thenReturn(Optional.empty());
 
-        ResponseEntity<Carro> response = carroController.pesquisarCarroPorModelo("Civi");
+        ResponseEntity<Carro> response = carroController.pesquisarCarroPorModelo(1L, "Civi");
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertNull(response.getBody());
@@ -117,7 +130,7 @@ class CarroControllerTest {
     void deletarCarroPorModeloTrimsPayloadAndReturnsMessage() {
         when(carroService.deleteByModelo("Civi")).thenReturn(new Carro("Civi", 2020));
 
-        ResponseEntity<String> response = carroController.deletarCarroPorModelo(" Civi ");
+        ResponseEntity<String> response = carroController.deletarCarroPorModelo(1L, " Civi ");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Carro deletado: Civi", response.getBody());
@@ -129,7 +142,7 @@ class CarroControllerTest {
         Carro carro = new Carro("Civi", 2020, 2500.0);
         when(carroService.updateByModelo("Civi", 2500.0)).thenReturn(carro);
 
-        ResponseEntity<Carro> response = carroController.atualizarCarroPorModelo(" Civi , 2500.0 ");
+        ResponseEntity<Carro> response = carroController.atualizarCarroPorModelo(1L, " Civi , 2500.0 ");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(carro, response.getBody());
@@ -138,13 +151,13 @@ class CarroControllerTest {
 
     @Test
     void atualizarCarroPorModeloRejectsMissingPrice() {
-        assertThrows(CarroException.class, () -> carroController.atualizarCarroPorModelo("Civi"));
+        assertThrows(CarroException.class, () -> carroController.atualizarCarroPorModelo(1L, "Civi"));
         verifyNoInteractions(carroService);
     }
 
     @Test
     void atualizarCarroPorModeloRejectsInvalidPrice() {
-        assertThrows(CarroException.class, () -> carroController.atualizarCarroPorModelo("Civi,abc"));
+        assertThrows(CarroException.class, () -> carroController.atualizarCarroPorModelo(1L, "Civi,abc"));
         verifyNoInteractions(carroService);
     }
 

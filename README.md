@@ -25,6 +25,8 @@ $env:SPRING_PROFILES_ACTIVE = "demo"
 Depois, crie um usuário com `POST http://localhost:8081/usuarios` e o corpo
 `{"nome":"Ana Silva"}`. Use o ID retornado no header `X-User-Id` das requisições
 à Loja. Consulte os logs em `http://localhost:8080/logs`.
+Abra `http://localhost:8080/` para usar a interface existente, agora com seleção
+de operador, CRUD de usuários e histórico de auditoria.
 
 ### Execução com MySQL
 
