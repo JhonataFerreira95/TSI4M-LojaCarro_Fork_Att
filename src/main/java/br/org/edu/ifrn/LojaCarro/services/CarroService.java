@@ -3,8 +3,12 @@ package br.org.edu.ifrn.LojaCarro.services;
 import br.org.edu.ifrn.LojaCarro.CarroException;
 import br.org.edu.ifrn.LojaCarro.model.Carro;
 import br.org.edu.ifrn.LojaCarro.repository.CarroRepository;
+import br.org.edu.ifrn.LojaCarro.repository.TestDriveRepository;
+import br.org.edu.ifrn.LojaCarro.repository.VendaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,6 +19,10 @@ public class CarroService {
 
     @Autowired
     public CarroRepository carroRepository;
+    @Autowired
+    private VendaRepository vendaRepository;
+    @Autowired
+    private TestDriveRepository testDriveRepository;
 
     public Carro save(Carro c) {
         validarModelo(c.getModelo());  // Valida o modelo antes de salvar
@@ -27,6 +35,7 @@ public class CarroService {
         if(id <= 0){
             throw new CarroException("O ID do carro não pode ser negativo. ID fornecido: " + id);
         }
+        validarSemReferencias(id);
         carroRepository.deleteById(id);
     }
 
@@ -62,8 +71,16 @@ public class CarroService {
 
     public Carro deleteByModelo(String modelo) {
         Carro carro = localizarCarroPorModelo(modelo);
+        validarSemReferencias(carro.getId());
         carroRepository.delete(carro);
         return carro;
+    }
+
+    private void validarSemReferencias(Long carroId) {
+        if (vendaRepository.existsByCarroId(carroId) || testDriveRepository.existsByCarroId(carroId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "O carro não pode ser excluído enquanto estiver vinculado a vendas ou test drives.");
+        }
     }
 
     // Método para atualizar (usa o save existente, mas pode ser renomeado se preferir)

@@ -306,15 +306,26 @@
     .management-panel h2 { margin: 0 0 14px; }
     .user-form { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 16px; }
     .user-form label { flex: 1; max-width: 460px; }
+    .module-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); align-items: end; gap: 10px; margin-bottom: 16px; }
+    .module-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .module-form input, .module-form select { min-width: 0; min-height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font: inherit; background: white; }
     .management-table { width: 100%; border-collapse: collapse; }
     .management-table th, .management-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; }
     .management-table th { color: var(--muted); font-size: 10px; letter-spacing: .08em; }
     .management-table td { font-size: 12px; }
-    .management-table button { margin-left: 6px; border: 0; background: transparent; color: var(--blue); cursor: pointer; font: inherit; }
+    .management-table button { margin-left: 6px; border: 0; background: transparent; color: var(--green); cursor: pointer; font: inherit; }
     .management-table button.danger { color: #c75050; }
     .management-empty { padding: 14px; color: var(--muted); font-size: 12px; }
     .log-operation { color: var(--muted); }
     .hidden { display: none !important; }
+    .login-panel { width: min(420px, calc(100% - 32px)); margin: 12vh auto; padding: 28px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: var(--shadow); }
+    .login-panel h1 { margin-bottom: 8px; font-size: 28px; }
+    .login-form { display: grid; gap: 14px; margin-top: 22px; }
+    .login-form label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .login-form input { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+    .login-form input:focus { border-color: #608d75; outline: 3px solid rgb(96 141 117 / 16%); }
+    .topbar-meta #logout-button { color: white; border: 1px solid rgb(255 255 255 / 35%); background: transparent; }
+    .topbar-meta #logout-button:hover { background: rgb(255 255 255 / 10%); }
 
     @media (max-width: 600px) {
       .operator-bar { align-items: stretch; flex-direction: column; }
@@ -328,12 +339,25 @@
   <header class="topbar">
     <div class="brand"><span class="brand-mark" aria-hidden="true">LC</span><span>LojaCarro</span></div>
     <div class="topbar-meta">
-      <span class="api-state" id="api-state"><span class="api-dot" aria-hidden="true"></span><span id="api-label">Conectando à API</span></span>
-      <span>GESTÃO DE ESTOQUE</span>
+      <span class="api-state" id="api-state"><span class="api-dot" aria-hidden="true"></span><span id="api-label">Acesso restrito</span></span>
+      <span id="admin-name"></span>
+      <button class="button hidden" id="logout-button" type="button">Sair</button>
     </div>
   </header>
 
-  <main class="workspace">
+  <main class="login-panel" id="login-panel" aria-labelledby="login-title">
+    <p class="eyebrow">ACESSO RESTRITO</p>
+    <h1 id="login-title">Entrar como administrador</h1>
+    <p class="subtitle">Faça login para acessar os módulos e a auditoria.</p>
+    <form class="login-form" id="login-form">
+      <label>E-mail<input name="email" type="email" autocomplete="username" required></label>
+      <label>Senha<input name="senha" type="password" autocomplete="current-password" required></label>
+      <button class="button button-primary" id="login-button" type="submit">Entrar</button>
+    </form>
+    <p class="form-error" id="login-error" role="alert"></p>
+  </main>
+
+  <main class="workspace hidden" id="workspace">
     <section class="page-heading" aria-labelledby="page-title">
       <div>
         <p class="eyebrow">INVENTÁRIO / VEÍCULOS</p>
@@ -347,15 +371,6 @@
       <div class="metric"><span class="metric-label">VEÍCULOS NO ESTOQUE</span><strong class="metric-value" id="total-count">—</strong></div>
       <div class="metric"><span class="metric-label">ANO MAIS RECENTE</span><strong class="metric-value" id="latest-year">—</strong></div>
       <div class="metric"><span class="metric-label">VALOR MÉDIO</span><strong class="metric-value" id="average-price">—</strong></div>
-    </section>
-
-    <section class="operator-bar" aria-label="Usuário responsável">
-      <label for="operator-select">Operador das ações de veículos
-        <select id="operator-select" required>
-          <option value="">Carregando usuários...</option>
-        </select>
-      </label>
-      <span class="subtitle">As ações no estoque são registradas com este usuário.</span>
     </section>
 
     <section aria-labelledby="inventory-title">
@@ -399,10 +414,80 @@
       </table>
     </section>
 
+    <section class="management-panel" aria-labelledby="admins-title">
+      <h2 id="admins-title">Administradores</h2>
+      <form class="module-form" id="admin-form">
+        <label>Nome<input name="nome" maxlength="120" required></label>
+        <label>E-mail<input name="email" type="email" maxlength="180" required></label>
+        <label>Senha<input name="senha" type="password" minlength="8" maxlength="72" autocomplete="new-password" placeholder="Mínimo 8 caracteres" required></label>
+        <button class="button button-primary" type="submit">Cadastrar administrador</button>
+        <button class="button button-secondary hidden" type="button" data-cancel-form="admin-form">Cancelar</button>
+      </form>
+      <p class="form-error" id="admin-error" role="alert"></p>
+      <table class="management-table">
+        <thead><tr><th>NOME</th><th>E-MAIL</th><th scope="col" aria-label="Ações"></th></tr></thead>
+        <tbody id="admin-list"></tbody>
+      </table>
+    </section>
+
+    <section class="management-panel" aria-labelledby="sales-title">
+      <h2 id="sales-title">Vendas</h2>
+      <form class="module-form" id="sale-form">
+        <label>Carro<select name="carroId" required></select></label>
+        <label>Cliente<select name="usuarioId" required></select></label>
+        <label>Data<input name="data" type="date" required></label>
+        <label>Valor<input name="valor" type="number" min="0.01" step="0.01" required></label>
+        <label>Status<select name="status" required><option>PENDENTE</option><option>CONCLUIDA</option><option>CANCELADA</option></select></label>
+        <button class="button button-primary" type="submit">Cadastrar venda</button>
+        <button class="button button-secondary hidden" type="button" data-cancel-form="sale-form">Cancelar</button>
+      </form>
+      <p class="form-error" id="sale-error" role="alert"></p>
+      <table class="management-table">
+        <thead><tr><th>ID</th><th>CARRO</th><th>CLIENTE</th><th>DATA</th><th>VALOR</th><th>STATUS</th><th scope="col" aria-label="Ações"></th></tr></thead>
+        <tbody id="sale-list"></tbody>
+      </table>
+    </section>
+
+    <section class="management-panel" aria-labelledby="test-drives-title">
+      <h2 id="test-drives-title">Test Drives</h2>
+      <form class="module-form" id="test-drive-form">
+        <label>Carro<select name="carroId" required></select></label>
+        <label>Cliente<select name="usuarioId" required></select></label>
+        <label>Data e hora<input name="dataHora" type="datetime-local" required></label>
+        <label>Status<select name="status" required><option>AGENDADO</option><option>CONCLUIDO</option><option>CANCELADO</option></select></label>
+        <button class="button button-primary" type="submit">Agendar test drive</button>
+        <button class="button button-secondary hidden" type="button" data-cancel-form="test-drive-form">Cancelar</button>
+      </form>
+      <p class="form-error" id="test-drive-error" role="alert"></p>
+      <table class="management-table">
+        <thead><tr><th>ID</th><th>CARRO</th><th>CLIENTE</th><th>DATA E HORA</th><th>STATUS</th><th scope="col" aria-label="Ações"></th></tr></thead>
+        <tbody id="test-drive-list"></tbody>
+      </table>
+    </section>
+
+    <section class="management-panel" aria-labelledby="accounting-title">
+      <h2 id="accounting-title">Contabilidade</h2>
+      <form class="module-form" id="accounting-form">
+        <label>Venda<select name="vendaId" required></select></label>
+        <label>Tipo de lançamento<input name="tipoLancamento" maxlength="40" placeholder="Receita ou despesa" required></label>
+        <label>Valor<input name="valor" type="number" min="0.01" step="0.01" required></label>
+        <label>Vencimento<input name="vencimento" type="date" required></label>
+        <label>Data do pagamento<input name="pagamento" type="date"></label>
+        <label>Status<select name="status" required><option>PENDENTE</option><option>PAGO</option><option>ATRASADO</option><option>CANCELADO</option></select></label>
+        <button class="button button-primary" type="submit">Cadastrar lançamento</button>
+        <button class="button button-secondary hidden" type="button" data-cancel-form="accounting-form">Cancelar</button>
+      </form>
+      <p class="form-error" id="accounting-error" role="alert"></p>
+      <table class="management-table">
+        <thead><tr><th>ID</th><th>VENDA</th><th>TIPO</th><th>VALOR</th><th>VENCIMENTO</th><th>PAGAMENTO</th><th>STATUS</th><th scope="col" aria-label="Ações"></th></tr></thead>
+        <tbody id="accounting-list"></tbody>
+      </table>
+    </section>
+
     <section class="management-panel" aria-labelledby="logs-title">
       <h2 id="logs-title">Últimas operações</h2>
       <table class="management-table">
-        <thead><tr><th>USUÁRIO</th><th>OPERAÇÃO</th><th>CARRO</th><th>DATA E HORA</th></tr></thead>
+        <thead><tr><th>RESPONSÁVEL</th><th>MÓDULO</th><th>OPERAÇÃO</th><th>REGISTRO</th><th>DATA E HORA</th></tr></thead>
         <tbody id="log-list"></tbody>
       </table>
     </section>
@@ -445,21 +530,76 @@
     const apiState = document.querySelector("#api-state");
     const apiLabel = document.querySelector("#api-label");
     const formError = document.querySelector("#form-error");
-    const operatorSelect = document.querySelector("#operator-select");
+    const loginPanel = document.querySelector("#login-panel");
+    const loginForm = document.querySelector("#login-form");
+    const loginError = document.querySelector("#login-error");
+    const loginButton = document.querySelector("#login-button");
+    const workspace = document.querySelector("#workspace");
+    const logoutButton = document.querySelector("#logout-button");
+    const adminName = document.querySelector("#admin-name");
     const userList = document.querySelector("#user-list");
     const userForm = document.querySelector("#user-form");
     const userError = document.querySelector("#user-error");
     const logList = document.querySelector("#log-list");
-    const usersApi = "http://localhost:8081/usuarios";
+    const usersApi = "/usuarios";
+    let csrfToken = "";
+    let authenticatedAdmin = null;
     let cars = [];
     let users = [];
+    const moduleRecords = { admins: [], sales: [], testDrives: [], accounting: [] };
+    const modules = [
+      {
+        key: "admins", formId: "admin-form", tableId: "admin-list", endpoint: "/administradores",
+        fields: ["nome", "email", "senha"],
+        columns: record => [record.nome, record.email]
+      },
+      {
+        key: "sales", formId: "sale-form", tableId: "sale-list", endpoint: "/vendas",
+        fields: ["carroId", "usuarioId", "data", "valor", "status"],
+        columns: record => [
+          `#${record.id}`, carName(record.carroId), userName(record.usuarioId),
+          record.data, money.format(Number(record.valor) || 0), record.status
+        ]
+      },
+      {
+        key: "testDrives", formId: "test-drive-form", tableId: "test-drive-list", endpoint: "/test-drives",
+        fields: ["carroId", "usuarioId", "dataHora", "status"],
+        columns: record => [
+          `#${record.id}`, carName(record.carroId), userName(record.usuarioId),
+          new Date(record.dataHora).toLocaleString("pt-BR"), record.status
+        ]
+      },
+      {
+        key: "accounting", formId: "accounting-form", tableId: "accounting-list", endpoint: "/lancamentos-contabeis",
+        fields: ["vendaId", "tipoLancamento", "valor", "vencimento", "pagamento", "status"],
+        columns: record => [
+          `#${record.id}`, `#${record.vendaId}`, record.tipoLancamento,
+          money.format(Number(record.valor) || 0), record.vencimento, record.pagamento || "—", record.status
+        ]
+      }
+    ];
 
     const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+    async function loadCsrfToken() {
+      const response = await fetch("/auth/csrf");
+      if (!response.ok) throw new Error("Não foi possível iniciar a proteção da sessão.");
+      const body = await response.json();
+      csrfToken = body.token;
+    }
+
     async function request(path, options = {}) {
+      const method = (options.method || "GET").toUpperCase();
+      if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method) && !csrfToken) {
+        await loadCsrfToken();
+      }
       const response = await fetch(path, {
         ...options,
-        headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers }
+        headers: {
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method) ? { "X-XSRF-TOKEN": csrfToken } : {}),
+          ...options.headers
+        }
       });
       if (!response.ok) {
         let message = `Erro ${response.status} ao acessar a API.`;
@@ -473,18 +613,38 @@
       return response.json();
     }
 
-    function userHeaders() {
-      if (!operatorSelect.value) throw new Error("Cadastre e selecione um usuário antes de operar o estoque.");
-      return { "X-User-Id": operatorSelect.value };
+    function showWorkspace(admin) {
+      authenticatedAdmin = admin;
+      adminName.textContent = `${admin.nome} · ${admin.email}`;
+      loginPanel.classList.add("hidden");
+      workspace.classList.remove("hidden");
+      logoutButton.classList.remove("hidden");
+      apiState.classList.remove("offline");
+      apiLabel.textContent = "Sessão autenticada";
+    }
+
+    function showLogin() {
+      authenticatedAdmin = null;
+      adminName.textContent = "";
+      workspace.classList.add("hidden");
+      logoutButton.classList.add("hidden");
+      loginPanel.classList.remove("hidden");
+    }
+
+    async function logout() {
+      try {
+        await request("/auth/logout", { method: "POST" });
+        csrfToken = "";
+        await loadCsrfToken();
+        showLogin();
+        loginForm.reset();
+        loginError.textContent = "";
+      } catch (error) {
+        setNotice(error.message, true);
+      }
     }
 
     function renderUsers() {
-      const selectedId = operatorSelect.value;
-      operatorSelect.replaceChildren(new Option("Selecione um usuário", ""));
-      users.forEach(user => operatorSelect.add(new Option(`${user.nome} (ID ${user.id})`, user.id)));
-      if (users.some(user => String(user.id) === selectedId)) operatorSelect.value = selectedId;
-      if (!operatorSelect.value && users.length) operatorSelect.value = String(users[0].id);
-
       userList.replaceChildren(...users.map(user => {
         const row = document.createElement("tr");
         const nameCell = document.createElement("td");
@@ -517,7 +677,7 @@
       try {
         users = await request(usersApi);
         renderUsers();
-        await Promise.all([loadCars(), loadLogs()]);
+        await Promise.all([loadCars(), loadLogs(), loadModuleRecords()]);
       } catch (error) {
         apiState.classList.add("offline");
         apiLabel.textContent = "API de usuários indisponível";
@@ -532,9 +692,10 @@
         logList.replaceChildren(...logs.slice(-20).reverse().map(log => {
           const row = document.createElement("tr");
           const values = [
-            `${log.usuarioNome} · #${log.usuarioId}`,
+            `${log.administradorNome || log.usuarioNome} · #${log.administradorId || log.usuarioId}`,
+            log.modulo || "CARRO",
             log.operacao.replaceAll("_", " "),
-            log.carroId == null ? "—" : `#${log.carroId}`,
+            (log.registroId ?? log.carroId) == null ? "—" : `#${log.registroId ?? log.carroId}`,
             new Date(log.dataHora).toLocaleString("pt-BR")
           ];
           values.forEach((value, index) => {
@@ -551,6 +712,168 @@
       }
     }
 
+    function carName(id) {
+      const car = cars.find(item => Number(item.id) === Number(id));
+      return car ? `${car.modelo} · #${car.id}` : `Carro #${id}`;
+    }
+
+    function userName(id) {
+      const user = users.find(item => Number(item.id) === Number(id));
+      return user ? `${user.nome} · #${user.id}` : `Usuário #${id}`;
+    }
+
+    function renderModuleTable(module) {
+      const body = document.querySelector(`#${module.tableId}`);
+      body.replaceChildren(...moduleRecords[module.key].map(record => {
+        const row = document.createElement("tr");
+        module.columns(record).forEach(value => {
+          const cell = document.createElement("td");
+          cell.textContent = value ?? "—";
+          row.append(cell);
+        });
+        const actions = document.createElement("td");
+        actions.dataset.label = "Ações";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.textContent = "Editar";
+        edit.addEventListener("click", () => editModuleRecord(module, record));
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "danger";
+        remove.textContent = "Excluir";
+        remove.addEventListener("click", () => deleteModuleRecord(module, record));
+        actions.append(edit, remove);
+        row.append(actions);
+        return row;
+      }));
+    }
+
+    function refreshModuleSelects() {
+      const carOptions = cars.map(car => [car.id, `${car.modelo} · #${car.id}`]);
+      const userOptions = users.map(user => [user.id, `${user.nome} · #${user.id}`]);
+      const saleOptions = moduleRecords.sales.map(sale => [sale.id, `Venda #${sale.id}`]);
+      for (const selector of document.querySelectorAll('select[name="carroId"]')) {
+        const value = selector.value;
+        selector.replaceChildren(new Option("Selecione um carro", ""));
+        carOptions.forEach(([id, label]) => selector.add(new Option(label, id)));
+        selector.value = value;
+      }
+      for (const selector of document.querySelectorAll('select[name="usuarioId"]')) {
+        const value = selector.value;
+        selector.replaceChildren(new Option("Selecione um cliente", ""));
+        userOptions.forEach(([id, label]) => selector.add(new Option(label, id)));
+        selector.value = value;
+      }
+      const saleSelect = document.querySelector('#accounting-form select[name="vendaId"]');
+      const saleId = saleSelect.value;
+      saleSelect.replaceChildren(new Option("Selecione uma venda", ""));
+      saleOptions.forEach(([id, label]) => saleSelect.add(new Option(label, id)));
+      saleSelect.value = saleId;
+    }
+
+    async function loadModuleRecords() {
+      try {
+        const results = await Promise.all(modules.map(module => request(module.endpoint)));
+        modules.forEach((module, index) => {
+          moduleRecords[module.key] = results[index];
+          renderModuleTable(module);
+        });
+        refreshModuleSelects();
+      } catch (error) {
+        setNotice(`Não foi possível carregar os módulos: ${error.message}`, true);
+      }
+    }
+
+    function resetModuleForm(module) {
+      const form = document.querySelector(`#${module.formId}`);
+      form.reset();
+      delete form.dataset.recordId;
+      form.querySelector('button[type="submit"]').textContent = module.key === "admins"
+        ? "Cadastrar administrador"
+        : module.key === "sales" ? "Cadastrar venda"
+          : module.key === "testDrives" ? "Agendar test drive" : "Cadastrar lançamento";
+      form.querySelector(`[data-cancel-form="${module.formId}"]`).classList.add("hidden");
+      if (module.key === "admins") form.elements.namedItem("senha").required = true;
+      if (module.key === "admins") form.elements.namedItem("senha").placeholder = "Mínimo 8 caracteres";
+      document.querySelector(`#${module.key === "testDrives" ? "test-drive" : module.key === "sales" ? "sale" : module.key === "accounting" ? "accounting" : "admin"}-error`).textContent = "";
+      refreshModuleSelects();
+    }
+
+    function editModuleRecord(module, record) {
+      const form = document.querySelector(`#${module.formId}`);
+      refreshModuleSelects();
+      module.fields.forEach(name => {
+        const input = form.elements.namedItem(name);
+        if (name === "senha") {
+          input.value = "";
+          input.required = false;
+          input.placeholder = "Deixe vazio para manter";
+        } else {
+          const value = record[name] ?? "";
+          input.value = name === "dataHora" && value ? value.slice(0, 16) : value;
+        }
+      });
+      form.dataset.recordId = record.id;
+      form.querySelector('button[type="submit"]').textContent = "Salvar alterações";
+      form.querySelector(`[data-cancel-form="${module.formId}"]`).classList.remove("hidden");
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function modulePayload(module, form) {
+      const values = Object.fromEntries(new FormData(form));
+      for (const name of ["carroId", "usuarioId", "vendaId"]) {
+        if (name in values) values[name] = values[name] ? Number(values[name]) : null;
+      }
+      if ("valor" in values) values.valor = Number(values.valor);
+      if ("pagamento" in values && !values.pagamento) values.pagamento = null;
+      if (module.key === "admins" && !values.senha) values.senha = null;
+      if (module.key === "testDrives" && values.dataHora) values.dataHora += ":00";
+      return values;
+    }
+
+    function moduleErrorId(module) {
+      return module.key === "testDrives" ? "test-drive-error"
+        : module.key === "sales" ? "sale-error"
+          : module.key === "accounting" ? "accounting-error" : "admin-error";
+    }
+
+    async function saveModuleRecord(module, event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!form.reportValidity()) return;
+      const id = form.dataset.recordId;
+      const submit = form.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      document.querySelector(`#${moduleErrorId(module)}`).textContent = "";
+      try {
+        await request(id ? `${module.endpoint}/${id}` : module.endpoint, {
+          method: id ? "PUT" : "POST",
+          body: JSON.stringify(modulePayload(module, form))
+        });
+        resetModuleForm(module);
+        await loadModuleRecords();
+        setNotice(id ? "Registro atualizado." : "Registro cadastrado.");
+      } catch (error) {
+        document.querySelector(`#${moduleErrorId(module)}`).textContent = error.message;
+      } finally {
+        submit.disabled = false;
+      }
+    }
+
+    async function deleteModuleRecord(module, record) {
+      if (!window.confirm(`Excluir o registro #${record.id}?`)) return;
+      try {
+        await request(`${module.endpoint}/${record.id}`, { method: "DELETE" });
+        if (document.querySelector(`#${module.formId}`).dataset.recordId === String(record.id)) {
+          resetModuleForm(module);
+        }
+        await loadModuleRecords();
+        setNotice("Registro excluído.");
+      } catch (error) {
+        setNotice(error.message, true);
+      }
+    }
+
     function resetUserForm() {
       userForm.reset();
       document.querySelector("#user-id").value = "";
@@ -563,7 +886,6 @@
       if (!window.confirm(`Excluir o usuário ${user.nome}?`)) return;
       try {
         await request(`${usersApi}/${user.id}`, { method: "DELETE" });
-        if (operatorSelect.value === String(user.id)) operatorSelect.value = "";
         await loadUsers();
         setNotice("Usuário excluído.");
       } catch (error) {
@@ -640,12 +962,10 @@
 
     async function loadCars() {
       try {
-        cars = operatorSelect.value
-          ? await request("/carro/listarCarros", { headers: userHeaders() })
-          : [];
+        cars = await request("/carro/listarCarros");
         apiState.classList.remove("offline");
-        apiLabel.textContent = operatorSelect.value ? "APIs conectadas" : "Selecione um usuário";
-        if (operatorSelect.value) setNotice("Estoque atualizado.");
+        apiLabel.textContent = "Sessão autenticada";
+        setNotice("Estoque atualizado.");
         renderCars();
       } catch (error) {
         apiState.classList.add("offline");
@@ -693,13 +1013,13 @@
       try {
         if (id) {
           payload.id = Number(id);
-          await request(`/carro/${id}`, { method: "PUT", body: JSON.stringify(payload), headers: userHeaders() });
+          await request(`/carro/${id}`, { method: "PUT", body: JSON.stringify(payload) });
         } else {
-          await request("/carro/salvar", { method: "POST", body: JSON.stringify(payload), headers: userHeaders() });
+          await request("/carro/salvar", { method: "POST", body: JSON.stringify(payload) });
         }
         dialog.close();
         setNotice(id ? "Veículo atualizado." : "Veículo cadastrado.");
-        await Promise.all([loadCars(), loadLogs()]);
+        await Promise.all([loadCars(), loadLogs(), loadModuleRecords()]);
       } catch (error) {
         formError.textContent = error.message;
       } finally {
@@ -710,9 +1030,9 @@
     async function deleteCar(car) {
       if (!window.confirm(`Excluir ${car.modelo} do estoque?`)) return;
       try {
-        await request(`/carro/${car.id}`, { method: "DELETE", headers: userHeaders() });
+        await request(`/carro/${car.id}`, { method: "DELETE" });
         setNotice("Veículo excluído.");
-        await Promise.all([loadCars(), loadLogs()]);
+        await Promise.all([loadCars(), loadLogs(), loadModuleRecords()]);
       } catch (error) {
         setNotice(error.message, true);
       }
@@ -722,8 +1042,33 @@
     document.querySelector("#cancel-dialog").addEventListener("click", () => dialog.close());
     form.addEventListener("submit", saveCar);
     search.addEventListener("input", renderCars);
-    operatorSelect.addEventListener("change", () => Promise.all([loadCars(), loadLogs()]));
+    logoutButton.addEventListener("click", logout);
+    loginForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      loginButton.disabled = true;
+      loginError.textContent = "";
+      const credentials = Object.fromEntries(new FormData(loginForm));
+      try {
+        await loadCsrfToken();
+        const admin = await request("/auth/login", {
+          method: "POST",
+          body: JSON.stringify(credentials)
+        });
+        csrfToken = "";
+        await loadCsrfToken();
+        showWorkspace(admin);
+        await loadUsers();
+      } catch (error) {
+        loginError.textContent = error.message;
+      } finally {
+        loginButton.disabled = false;
+      }
+    });
     document.querySelector("#cancel-user-edit").addEventListener("click", resetUserForm);
+    for (const module of modules) {
+      document.querySelector(`#${module.formId}`).addEventListener("submit", event => saveModuleRecord(module, event));
+      document.querySelector(`[data-cancel-form="${module.formId}"]`).addEventListener("click", () => resetModuleForm(module));
+    }
     userForm.addEventListener("submit", async event => {
       event.preventDefault();
       const userId = document.querySelector("#user-id").value;
@@ -744,7 +1089,19 @@
       if (event.target === dialog) dialog.close();
     });
 
-    loadUsers();
+    async function restoreSession() {
+      try {
+        await loadCsrfToken();
+        authenticatedAdmin = await request("/auth/me");
+        showWorkspace(authenticatedAdmin);
+        await loadUsers();
+      } catch (error) {
+        showLogin();
+        if (!error.message.startsWith("Erro 401")) loginError.textContent = error.message;
+      }
+    }
+
+    restoreSession();
   </script>
 </body>
 </html>

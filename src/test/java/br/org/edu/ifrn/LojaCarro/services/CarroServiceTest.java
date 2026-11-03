@@ -3,6 +3,8 @@ package br.org.edu.ifrn.LojaCarro.services;
 import br.org.edu.ifrn.LojaCarro.CarroException;
 import br.org.edu.ifrn.LojaCarro.model.Carro;
 import br.org.edu.ifrn.LojaCarro.repository.CarroRepository;
+import br.org.edu.ifrn.LojaCarro.repository.TestDriveRepository;
+import br.org.edu.ifrn.LojaCarro.repository.VendaRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -11,6 +13,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,6 +27,12 @@ class CarroServiceTest {
 
     @Mock
     private CarroRepository carroRepository;
+
+    @Mock
+    private VendaRepository vendaRepository;
+
+    @Mock
+    private TestDriveRepository testDriveRepository;
 
     @InjectMocks
     private CarroService carroService;
@@ -69,6 +78,17 @@ class CarroServiceTest {
         carroService.deleteById(4L);
 
         verify(carroRepository).deleteById(4L);
+    }
+
+    @Test
+    void deleteByIdRejectsCarsUsedBySales() {
+        when(vendaRepository.existsByCarroId(4L)).thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> carroService.deleteById(4L));
+
+        assertEquals(409, exception.getStatusCode().value());
+        verify(carroRepository, never()).deleteById(anyLong());
     }
 
     @ParameterizedTest
