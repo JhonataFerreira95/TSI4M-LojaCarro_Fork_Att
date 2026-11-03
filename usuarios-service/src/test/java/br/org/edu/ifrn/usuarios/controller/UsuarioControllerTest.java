@@ -2,6 +2,7 @@ package br.org.edu.ifrn.usuarios.controller;
 
 import br.org.edu.ifrn.usuarios.model.Usuario;
 import br.org.edu.ifrn.usuarios.repository.UsuarioRepository;
+import br.org.edu.ifrn.usuarios.repository.AuditOutboxRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,8 +24,12 @@ class UsuarioControllerTest {
     @Autowired
     private UsuarioRepository repository;
 
+    @Autowired
+    private AuditOutboxRepository outboxRepository;
+
     @BeforeEach
     void limparBanco() {
+        outboxRepository.deleteAll();
         repository.deleteAll();
     }
 
@@ -54,6 +59,12 @@ class UsuarioControllerTest {
 
         mockMvc.perform(get("/usuarios/{id}", usuario.getId()))
                 .andExpect(status().isNotFound());
+
+        var eventos = outboxRepository.findAll();
+        org.junit.jupiter.api.Assertions.assertEquals(4, eventos.size());
+        org.junit.jupiter.api.Assertions.assertTrue(eventos.stream()
+                .allMatch(evento -> evento.getSourceService().equals("usuarios-service")
+                        && evento.getActorName().equals("usuarios-service")));
     }
 
     @Test

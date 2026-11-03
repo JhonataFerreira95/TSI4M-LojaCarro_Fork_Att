@@ -1,9 +1,9 @@
 package br.org.edu.ifrn.LojaCarro.services;
 
-import br.org.edu.ifrn.LojaCarro.model.LogOperacao;
+import br.org.edu.ifrn.LojaCarro.model.AuditOutboxEvent;
 import br.org.edu.ifrn.LojaCarro.model.Administrador;
 import br.org.edu.ifrn.LojaCarro.repository.AdministradorRepository;
-import br.org.edu.ifrn.LojaCarro.repository.LogOperacaoRepository;
+import br.org.edu.ifrn.LojaCarro.repository.AuditOutboxRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -26,7 +26,7 @@ class CarroAuditoriaServiceTest {
 
     @Test
     void registraOperacaoComAdministradorAutenticado() {
-        LogOperacaoRepository logRepository = mock(LogOperacaoRepository.class);
+        AuditOutboxRepository outboxRepository = mock(AuditOutboxRepository.class);
         AdministradorRepository administradorRepository = mock(AdministradorRepository.class);
         Administrador administrador = mock(Administrador.class);
         when(administradorRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(administrador));
@@ -35,32 +35,33 @@ class CarroAuditoriaServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated("admin@example.com", "",
                         List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
-        CarroAuditoriaService service = new CarroAuditoriaService(logRepository, administradorRepository);
+        CarroAuditoriaService service = new CarroAuditoriaService(outboxRepository, administradorRepository);
 
         String resultado = service.executar("CARRO", "CRIAR", () -> "criado", value -> 42L);
 
         assertEquals("criado", resultado);
-        ArgumentCaptor<LogOperacao> captor = ArgumentCaptor.forClass(LogOperacao.class);
-        verify(logRepository).save(captor.capture());
-        LogOperacao log = captor.getValue();
-        assertEquals(7L, log.getUsuarioId());
-        assertEquals("Ana Silva", log.getUsuarioNome());
-        assertEquals(7L, log.getAdministradorId());
-        assertEquals("Ana Silva", log.getAdministradorNome());
-        assertEquals("CRIAR", log.getOperacao());
-        assertEquals(42L, log.getCarroId());
-        assertNotNull(log.getDataHora());
+        ArgumentCaptor<AuditOutboxEvent> captor = ArgumentCaptor.forClass(AuditOutboxEvent.class);
+        verify(outboxRepository).save(captor.capture());
+        AuditOutboxEvent event = captor.getValue();
+        assertEquals("loja-carros", event.getSourceService());
+        assertEquals("CARRO", event.getModule());
+        assertEquals("ADMINISTRADOR", event.getActorType());
+        assertEquals(7L, event.getActorId());
+        assertEquals("Ana Silva", event.getActorName());
+        assertEquals("CRIAR", event.getOperation());
+        assertEquals(42L, event.getRecordId());
+        assertNotNull(event.getOccurredAt());
     }
 
     @Test
     void naoExecutaAcaoNemGravaLogSemAdministradorAutenticado() {
-        LogOperacaoRepository logRepository = mock(LogOperacaoRepository.class);
+        AuditOutboxRepository outboxRepository = mock(AuditOutboxRepository.class);
         AdministradorRepository administradorRepository = mock(AdministradorRepository.class);
-        CarroAuditoriaService service = new CarroAuditoriaService(logRepository, administradorRepository);
+        CarroAuditoriaService service = new CarroAuditoriaService(outboxRepository, administradorRepository);
 
         assertThrows(IllegalStateException.class,
                 () -> service.executar("CARRO", "EXCLUIR", () -> fail("A operação não deveria executar."), value -> null));
 
-        verifyNoInteractions(logRepository);
+        verifyNoInteractions(outboxRepository);
     }
 }

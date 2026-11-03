@@ -692,7 +692,9 @@
         logList.replaceChildren(...logs.slice(-20).reverse().map(log => {
           const row = document.createElement("tr");
           const values = [
-            `${log.administradorNome || log.usuarioNome} · #${log.administradorId || log.usuarioId}`,
+            log.tipoAtor === "SERVICO"
+              ? `${log.servicoOrigem} (serviço)`
+              : `${log.administradorNome || log.usuarioNome} · #${log.administradorId || log.usuarioId}`,
             log.modulo || "CARRO",
             log.operacao.replaceAll("_", " "),
             (log.registroId ?? log.carroId) == null ? "—" : `#${log.registroId ?? log.carroId}`,

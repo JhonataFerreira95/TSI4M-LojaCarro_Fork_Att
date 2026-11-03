@@ -33,6 +33,12 @@ public class LogOperacao {
     @Column(name = "administrador_nome")
     private String administradorNome;
 
+    @Column(name = "servico_origem", length = 80)
+    private String servicoOrigem;
+
+    @Column(name = "tipo_ator", length = 30)
+    private String tipoAtor;
+
     @Column(name = "carro_id")
     private Long carroId;
 
@@ -75,7 +81,28 @@ public class LogOperacao {
         if (auditadoPorAdministrador) {
             this.administradorId = usuarioId;
             this.administradorNome = usuarioNome;
+            this.servicoOrigem = "loja-carros";
+            this.tipoAtor = "ADMINISTRADOR";
         }
+    }
+
+    public static LogOperacao fromOutboxEvent(AuditOutboxEvent event) {
+        LogOperacao log = new LogOperacao(
+                event.getActorId() == null ? 0L : event.getActorId(),
+                event.getActorName() == null ? event.getSourceService() : event.getActorName(),
+                event.getModule(),
+                event.getOperation(),
+                "CARRO".equals(event.getModule()) ? event.getRecordId() : null,
+                event.getRecordId(),
+                event.getOccurredAt(),
+                false);
+        log.servicoOrigem = event.getSourceService();
+        log.tipoAtor = event.getActorType();
+        if ("ADMINISTRADOR".equals(event.getActorType())) {
+            log.administradorId = event.getActorId();
+            log.administradorNome = event.getActorName();
+        }
+        return log;
     }
 
     public Long getId() {
@@ -103,11 +130,25 @@ public class LogOperacao {
     }
 
     public Long getAdministradorId() {
+        if ("SERVICO".equals(tipoAtor)) {
+            return null;
+        }
         return administradorId == null ? usuarioId : administradorId;
     }
 
     public String getAdministradorNome() {
+        if ("SERVICO".equals(tipoAtor)) {
+            return null;
+        }
         return administradorNome == null ? usuarioNome : administradorNome;
+    }
+
+    public String getServicoOrigem() {
+        return servicoOrigem;
+    }
+
+    public String getTipoAtor() {
+        return tipoAtor;
     }
 
     public Long getCarroId() {

@@ -1,12 +1,15 @@
 package br.org.edu.ifrn.LojaCarro.controllers;
 
+import br.org.edu.ifrn.LojaCarro.model.AuditOutboxEvent;
 import br.org.edu.ifrn.LojaCarro.model.Carro;
+import br.org.edu.ifrn.LojaCarro.repository.AdministradorRepository;
+import br.org.edu.ifrn.LojaCarro.repository.AuditOutboxRepository;
 import br.org.edu.ifrn.LojaCarro.repository.CarroRepository;
-import br.org.edu.ifrn.LojaCarro.repository.LogOperacaoRepository;
 import br.org.edu.ifrn.LojaCarro.repository.LancamentoContabilRepository;
+import br.org.edu.ifrn.LojaCarro.repository.LogOperacaoRepository;
 import br.org.edu.ifrn.LojaCarro.repository.TestDriveRepository;
 import br.org.edu.ifrn.LojaCarro.repository.VendaRepository;
-import br.org.edu.ifrn.LojaCarro.repository.AdministradorRepository;
+import br.org.edu.ifrn.LojaCarro.services.AuditOutboxProcessor;
 import br.org.edu.ifrn.LojaCarro.services.UsuarioClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,15 +17,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.security.test.context.support.WithMockUser;
 
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 
@@ -56,6 +63,12 @@ class ModuloCrudControllerTest {
     private LogOperacaoRepository logRepository;
 
     @Autowired
+    private AuditOutboxRepository outboxRepository;
+
+    @Autowired
+    private AuditOutboxProcessor outboxProcessor;
+
+    @Autowired
     private AdministradorRepository administradorRepository;
 
     @MockitoBean
@@ -67,6 +80,7 @@ class ModuloCrudControllerTest {
     void prepararBanco() {
         lancamentoRepository.deleteAll();
         logRepository.deleteAll();
+        outboxRepository.deleteAll();
         testDriveRepository.deleteAll();
         vendaRepository.deleteAll();
         carroRepository.deleteAll();
@@ -142,6 +156,7 @@ class ModuloCrudControllerTest {
         mockMvc.perform(delete("/test-drives/{id}", testDriveId).with(csrf()))
                 .andExpect(status().isNoContent());
 
+        outboxProcessor.processarPendentes();
         var logs = logRepository.findAll();
         assertTrue(logs.stream().anyMatch(log -> log.getModulo().equals("VENDA")
                 && log.getOperacao().equals("CRIAR") && log.getRegistroId().equals(vendaId)
@@ -164,9 +179,26 @@ class ModuloCrudControllerTest {
     }
 
     @Test
+    void consomeEventoDeOutroServicoSemAtribuirAdministrador() {
+        outboxRepository.save(new AuditOutboxEvent("usuarios-service", "USUARIO", "CRIAR",
+                12L, "SERVICO", null, "usuarios-service", Instant.now()));
+
+        assertEquals(1, outboxProcessor.processarPendentes());
+        assertEquals(0, outboxProcessor.processarPendentes());
+
+        var registro = logRepository.findAll().get(0);
+        assertEquals("usuarios-service", registro.getServicoOrigem());
+        assertEquals("SERVICO", registro.getTipoAtor());
+        assertNull(registro.getAdministradorId());
+        assertNull(registro.getAdministradorNome());
+        assertEquals(12L, registro.getRegistroId());
+    }
+
+    @Test
     void logIdentificaOperadorAutenticadoIndependenteDoClienteDaVenda() throws Exception {
         mockMvc.perform(get("/vendas"))
                 .andExpect(status().isOk());
+        outboxProcessor.processarPendentes();
         var registro = logRepository.findAll().get(0);
         assertTrue(registro.getAdministradorNome().equals("Test Admin"));
         assertTrue(registro.getModulo().equals("VENDA"));

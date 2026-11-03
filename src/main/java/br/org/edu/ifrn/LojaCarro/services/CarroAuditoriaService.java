@@ -1,9 +1,9 @@
 package br.org.edu.ifrn.LojaCarro.services;
 
-import br.org.edu.ifrn.LojaCarro.model.LogOperacao;
+import br.org.edu.ifrn.LojaCarro.model.AuditOutboxEvent;
 import br.org.edu.ifrn.LojaCarro.model.Administrador;
 import br.org.edu.ifrn.LojaCarro.repository.AdministradorRepository;
-import br.org.edu.ifrn.LojaCarro.repository.LogOperacaoRepository;
+import br.org.edu.ifrn.LojaCarro.repository.AuditOutboxRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.core.Authentication;
@@ -17,11 +17,11 @@ import java.util.function.Supplier;
 @Service
 public class CarroAuditoriaService {
 
-    private final LogOperacaoRepository logRepository;
+    private final AuditOutboxRepository outboxRepository;
     private final AdministradorRepository administradorRepository;
 
-    public CarroAuditoriaService(LogOperacaoRepository logRepository, AdministradorRepository administradorRepository) {
-        this.logRepository = logRepository;
+    public CarroAuditoriaService(AuditOutboxRepository outboxRepository, AdministradorRepository administradorRepository) {
+        this.outboxRepository = outboxRepository;
         this.administradorRepository = administradorRepository;
     }
 
@@ -43,8 +43,9 @@ public class CarroAuditoriaService {
                 .orElseThrow(() -> new IllegalStateException("O administrador autenticado não existe mais."));
         T resultado = acao.get();
         if (registrarResultado.test(resultado)) {
-            logRepository.save(LogOperacao.paraAdministrador(administrador.getId(), administrador.getNome(),
-                    modulo, operacao, extrairRegistroId.apply(resultado), Instant.now()));
+            outboxRepository.save(new AuditOutboxEvent("loja-carros", modulo, operacao,
+                    extrairRegistroId.apply(resultado), "ADMINISTRADOR", administrador.getId(),
+                    administrador.getNome(), Instant.now()));
         }
         return resultado;
     }
